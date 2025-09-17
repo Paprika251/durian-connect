@@ -39,8 +39,8 @@ const BrokerDashboard = () => {
 
           {!isAccepted ? (
             /* Pending Approval State */
-            <div className="max-w-2xl mx-auto">
-              <Card className="shadow-soft border-0 bg-card/80 backdrop-blur text-center">
+            <div className="max-w-4xl mx-auto">
+              <Card className="shadow-soft border-0 bg-card/80 backdrop-blur text-center mb-8">
                 <CardContent className="pt-8 pb-8">
                   <div className="flex justify-center mb-4">
                     <Clock className="h-16 w-16 text-primary" />
@@ -51,14 +51,49 @@ const BrokerDashboard = () => {
                   <p className="text-muted-foreground mb-6">
                     ใบสมัครของคุณอยู่ระหว่างการพิจารณา กรุณารอการติดต่อกลับ
                   </p>
-                  <Link to="/submit-proposal">
-                    <Button className="bg-gradient-primary hover:opacity-90 text-primary-foreground shadow-soft">
-                      <PlusCircle className="h-4 w-4 mr-2" />
-                      ยื่นข้อเสนอซื้อ
-                    </Button>
-                  </Link>
                 </CardContent>
               </Card>
+
+              {/* Available Actions */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Submit Proposal */}
+                <Link to="/submit-proposal">
+                  <Card className="shadow-card border-0 bg-card/80 backdrop-blur hover:shadow-soft transition-smooth cursor-pointer group">
+                    <CardContent className="p-6 text-center">
+                      <div className="flex justify-center mb-4">
+                        <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-full shadow-soft group-hover:scale-105 transition-transform">
+                          <PlusCircle className="h-6 w-6 text-white" />
+                        </div>
+                      </div>
+                      <CardTitle className="text-lg mb-2 text-foreground">
+                        ยื่นข้อเสนอซื้อ
+                      </CardTitle>
+                      <CardDescription className="text-muted-foreground">
+                        เสนอราคาซื้อผลทุเรียน
+                      </CardDescription>
+                    </CardContent>
+                  </Card>
+                </Link>
+
+                {/* View Proposals */}
+                <Link to="/proposals">
+                  <Card className="shadow-card border-0 bg-card/80 backdrop-blur hover:shadow-soft transition-smooth cursor-pointer group">
+                    <CardContent className="p-6 text-center">
+                      <div className="flex justify-center mb-4">
+                        <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full shadow-soft group-hover:scale-105 transition-transform">
+                          <FileText className="h-6 w-6 text-white" />
+                        </div>
+                      </div>
+                      <CardTitle className="text-lg mb-2 text-foreground">
+                        ดูข้อเสนอที่เสนอไว้
+                      </CardTitle>
+                      <CardDescription className="text-muted-foreground">
+                        ตรวจสอบข้อเสนอที่ส่งไปแล้ว
+                      </CardDescription>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </div>
             </div>
           ) : (
             /* Accepted State - Main Dashboard */
