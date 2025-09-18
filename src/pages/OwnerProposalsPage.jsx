@@ -1,0 +1,161 @@
+import { useEffect, useState } from 'react';
+import { fetchProposals, updateProposalStatus } from '../services/api.js';
+
+const statusLabels = {
+  pending: 'รอการพิจารณา',
+  accepted: 'ยอมรับแล้ว',
+  rejected: 'ปฏิเสธ',
+};
+
+const statusColors = {
+  pending: 'bg-amber-100 text-amber-700',
+  accepted: 'bg-emerald-100 text-emerald-800',
+  rejected: 'bg-red-100 text-red-700',
+};
+
+const OwnerProposalsPage = () => {
+  const [proposals, setProposals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetchProposals();
+      setProposals(response.proposals || []);
+    } catch (err) {
+      setError(err.message || 'ไม่สามารถโหลดข้อมูลได้');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const handleUpdateStatus = async (id, status) => {
+    setActionMessage('');
+    try {
+      await updateProposalStatus(id, status);
+      setActionMessage(status === 'accepted' ? 'ยอมรับข้อเสนอเรียบร้อยแล้ว' : 'ปฏิเสธข้อเสนอเรียบร้อยแล้ว');
+      await loadData();
+    } catch (err) {
+      setActionMessage(err.message || 'ไม่สามารถอัปเดตสถานะได้');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-emerald-50">
+      <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
+        <header className="space-y-2">
+          <h1 className="text-3xl font-bold text-emerald-900">ข้อเสนอจากผู้รับเหมา</h1>
+          <p className="text-emerald-700">ตรวจสอบรายละเอียดและยืนยันการทำงานกับผู้รับเหมา</p>
+        </header>
+
+        {loading ? (
+          <div className="bg-white border border-emerald-100 rounded-3xl shadow p-6 text-center text-emerald-700">กำลังโหลดข้อมูล...</div>
+        ) : error ? (
+          <div className="bg-red-50 border border-red-200 text-red-700 rounded-3xl shadow p-6 text-center">{error}</div>
+        ) : (
+          <div className="space-y-4">
+            {actionMessage && (
+              <div className="bg-emerald-100/70 border border-emerald-200 text-emerald-800 rounded-2xl px-4 py-3 text-sm">
+                {actionMessage}
+              </div>
+            )}
+
+            {proposals.length === 0 ? (
+              <p className="text-emerald-700">ยังไม่มีข้อเสนอเข้ามา</p>
+            ) : (
+              <div className="space-y-4">
+                {proposals.map((proposal) => (
+                  <article
+                    key={proposal.id}
+                    className="bg-white border border-emerald-100 rounded-3xl shadow p-6 space-y-4"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                      <div>
+                        <h2 className="text-xl font-semibold text-emerald-900">
+                          ข้อเสนอจาก {proposal.broker?.name || 'ไม่ทราบชื่อ'}
+                        </h2>
+                        <p className="text-sm text-emerald-700">
+                          ส่งเมื่อ {new Date(proposal.createdAt).toLocaleString('th-TH')}
+                        </p>
+                      </div>
+                      <span className={`px-4 py-2 text-sm font-semibold rounded-full ${statusColors[proposal.status] || statusColors.pending}`}>
+                        {statusLabels[proposal.status] || statusLabels.pending}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-emerald-800">
+                      <Detail label="วันครบกำหนดติดต่อกลับ" value={new Date(proposal.contactDeadline).toLocaleDateString('th-TH')} />
+                      <Detail label="ปริมาณที่ต้องการ" value={`${proposal.quantity} กิโลกรัม`} />
+                      <Detail label="ราคาที่เสนอ" value={`${proposal.price} บาท/กิโลกรัม`} />
+                      <Detail label="วิธีการจ่ายเงิน" value={mapPaymentMethod(proposal.paymentMethod)} />
+                      <Detail label="เบอร์ติดต่อ" value={proposal.broker?.phone || '-'} />
+                      <Detail label="อีเมล" value={proposal.broker?.email || '-'} />
+                      <Detail label="ที่อยู่" value={proposal.broker?.address || '-'} full />
+                    </div>
+
+                    {proposal.note && (
+                      <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-4 py-3 text-emerald-800 text-sm">
+                        <p className="font-semibold">หมายเหตุ</p>
+                        <p>{proposal.note}</p>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateStatus(proposal.id, 'accepted')}
+                        disabled={proposal.status === 'accepted'}
+                        className="h-10 px-5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                      >
+                        ยอมรับข้อเสนอ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateStatus(proposal.id, 'rejected')}
+                        disabled={proposal.status === 'rejected'}
+                        className="h-10 px-5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 disabled:opacity-60"
+                      >
+                        ปฏิเสธข้อเสนอ
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const Detail = ({ label, value, full }) => (
+  <div className={full ? 'md:col-span-2 space-y-1' : 'space-y-1'}>
+    <p className="text-xs text-emerald-600 uppercase tracking-wide">{label}</p>
+    <p className="text-emerald-900 font-medium">{value}</p>
+  </div>
+);
+
+const mapPaymentMethod = (value) => {
+  switch (value) {
+    case 'cash':
+      return 'เงินสด';
+    case 'transfer':
+      return 'โอนเงิน';
+    case 'installment':
+      return 'ผ่อนชำระ';
+    case 'credit':
+      return 'บัตรเครดิต';
+    case 'other':
+    default:
+      return 'อื่น ๆ';
+  }
+};
+
+export default OwnerProposalsPage;
