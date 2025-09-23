@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import BackButton from '../components/BackButton.jsx';
 
 const BrokerRegistrationPage = () => {
   const navigate = useNavigate();
@@ -35,6 +36,7 @@ const BrokerRegistrationPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-tr from-emerald-50 via-amber-50 to-emerald-100 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-3xl bg-white/90 backdrop-blur rounded-3xl border border-emerald-200 shadow-lg p-10">
+        <BackButton fallback="/" className="mb-6" />
         <header className="mb-8 text-center space-y-2">
           <h1 className="text-3xl font-bold text-emerald-900">ลงทะเบียนผู้รับเหมาใหม่</h1>
           <p className="text-emerald-700">กรุณากรอกข้อมูลให้ครบถ้วนเพื่อให้เจ้าของสวนพิจารณา</p>

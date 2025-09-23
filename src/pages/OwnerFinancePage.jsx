@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import BackButton from '../components/BackButton.jsx';
 import { fetchFinanceRecords, updateFinanceStatus } from '../services/api.js';
 
 const statusLabels = {
@@ -24,6 +25,8 @@ const OwnerFinancePage = () => {
   const [error, setError] = useState('');
   const [totals, setTotals] = useState({ income: 0, expense: 0, balance: 0 });
   const [message, setMessage] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   const loadData = async () => {
     try {
@@ -53,12 +56,68 @@ const OwnerFinancePage = () => {
     }
   };
 
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredRecords = useMemo(() => {
+    return records.filter((record) => {
+      if (statusFilter !== 'all' && record.status !== statusFilter) {
+        return false;
+      }
+      if (!normalizedSearch) return true;
+      const haystack = [
+        record.broker?.name,
+        record.broker?.email,
+        record.notes,
+        record.invoiceRef,
+        record.paymentMethod,
+        typeLabels[record.type],
+        statusLabels[record.status],
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [normalizedSearch, records, statusFilter]);
+
   return (
     <div className="min-h-screen bg-emerald-50">
       <div className="max-w-6xl mx-auto px-6 py-10 space-y-6">
-        <header className="space-y-2">
-          <h1 className="text-3xl font-bold text-emerald-900">รายรับ / รายจ่ายของสวน</h1>
-          <p className="text-emerald-700">ตรวจสอบและยืนยันรายการจากผู้รับเหมา พร้อมดูสรุปภาพรวม</p>
+        <BackButton fallback="/owner/dashboard" />
+        <header className="space-y-4">
+          <div>
+            <h1 className="text-3xl font-bold text-emerald-900">รายรับ / รายจ่ายของสวน</h1>
+            <p className="text-emerald-700">ตรวจสอบและยืนยันรายการจากผู้รับเหมา พร้อมดูสรุปภาพรวม</p>
+          </div>
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <label className="flex flex-col gap-2 text-sm text-emerald-800">
+                <span className="font-medium">ค้นหารายการ</span>
+                <input
+                  type="search"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  className="w-full sm:w-72 h-11 rounded-xl border border-emerald-200 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  placeholder="ค้นหาจากชื่อผู้ส่ง หมายเหตุ หรือเลขใบเสร็จ"
+                />
+              </label>
+              <label className="flex flex-col gap-2 text-sm text-emerald-800">
+                <span className="font-medium">กรองตามสถานะ</span>
+                <select
+                  value={statusFilter}
+                  onChange={(event) => setStatusFilter(event.target.value)}
+                  className="w-full sm:w-48 h-11 rounded-xl border border-emerald-200 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                >
+                  <option value="all">ทั้งหมด</option>
+                  <option value="pending">รออนุมัติ</option>
+                  <option value="approved">อนุมัติแล้ว</option>
+                  <option value="rejected">ถูกปฏิเสธ</option>
+                </select>
+              </label>
+            </div>
+            <div className="text-sm text-emerald-700">
+              แสดง {filteredRecords.length} จาก {records.length} รายการ
+            </div>
+          </div>
         </header>
 
         {loading ? (
@@ -93,17 +152,24 @@ const OwnerFinancePage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-emerald-50">
-                  {records.map((record) => (
-                    <tr key={record.id} className="hover:bg-emerald-50/70 text-sm text-emerald-800">
-                      <td className="px-4 py-3">{new Date(record.createdAt).toLocaleString('th-TH')}</td>
-                      <td className="px-4 py-3">{record.broker?.name || '-'}</td>
-                      <td className="px-4 py-3">{typeLabels[record.type] || record.type}</td>
-                      <td className="px-4 py-3 font-semibold">{Number(record.amount).toLocaleString('th-TH', { style: 'currency', currency: 'THB' })}</td>
-                      <td className="px-4 py-3">{mapPaymentMethod(record.paymentMethod)}</td>
-                      <td className="px-4 py-3">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColors[record.status] || statusColors.pending}`}>
-                          {statusLabels[record.status] || statusLabels.pending}
-                        </span>
+                  {filteredRecords.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-6 text-center text-emerald-700">
+                        {records.length === 0 ? 'ยังไม่มีการส่งรายการ' : 'ไม่พบรายการที่ตรงกับเงื่อนไขค้นหา'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRecords.map((record) => (
+                      <tr key={record.id} className="hover:bg-emerald-50/70 text-sm text-emerald-800">
+                        <td className="px-4 py-3">{new Date(record.createdAt).toLocaleString('th-TH')}</td>
+                        <td className="px-4 py-3">{record.broker?.name || '-'}</td>
+                        <td className="px-4 py-3">{typeLabels[record.type] || record.type}</td>
+                        <td className="px-4 py-3 font-semibold">{Number(record.amount || 0).toLocaleString('th-TH', { style: 'currency', currency: 'THB' })}</td>
+                        <td className="px-4 py-3">{mapPaymentMethod(record.paymentMethod)}</td>
+                        <td className="px-4 py-3">
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusColors[record.status] || statusColors.pending}`}>
+                            {statusLabels[record.status] || statusLabels.pending}
+                          </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
@@ -126,7 +192,8 @@ const OwnerFinancePage = () => {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    ))
+                  )}
                 </tbody>
               </table>
             </section>

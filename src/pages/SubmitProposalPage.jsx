@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import BackButton from '../components/BackButton.jsx';
 import { createProposal } from '../services/api.js';
 
 const initialState = {
@@ -55,6 +56,7 @@ const SubmitProposalPage = () => {
     <div className="min-h-screen bg-emerald-50">
       <div className="max-w-4xl mx-auto px-6 py-10">
         <div className="bg-white border border-emerald-100 rounded-3xl shadow-lg p-8 space-y-6">
+          <BackButton fallback="/broker/dashboard" />
           <header className="space-y-2">
             <h1 className="text-2xl font-bold text-emerald-900">ยื่นข้อเสนอซื้อทุเรียนจากสวน</h1>
             <p className="text-emerald-700">
@@ -126,13 +128,7 @@ const SubmitProposalPage = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/broker/dashboard')}
-                className="h-11 px-5 rounded-xl border border-emerald-200 text-emerald-700 hover:border-emerald-400"
-              >
-                ย้อนกลับ
-              </button>
+              <BackButton fallback="/broker/dashboard" />
               <button
                 type="submit"
                 disabled={loading}

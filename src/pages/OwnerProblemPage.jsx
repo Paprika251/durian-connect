@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import BackButton from '../components/BackButton.jsx';
 import { fetchProblemReports, respondProblemReport } from '../services/api.js';
 
 const OwnerProblemPage = () => {
@@ -7,6 +8,7 @@ const OwnerProblemPage = () => {
   const [error, setError] = useState('');
   const [responses, setResponses] = useState({});
   const [message, setMessage] = useState('');
+  const [search, setSearch] = useState('');
 
   const loadData = async () => {
     try {
@@ -45,12 +47,49 @@ const OwnerProblemPage = () => {
     }
   };
 
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredReports = useMemo(() => {
+    if (!normalizedSearch) return reports;
+    return reports.filter((report) => {
+      const haystack = [
+        report.treeId,
+        report.broker?.name,
+        report.broker?.email,
+        report.broker?.phone,
+        report.notes,
+        report.ownerResponse?.message,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [normalizedSearch, reports]);
+
   return (
     <div className="min-h-screen bg-emerald-50">
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
-        <header className="space-y-2">
-          <h1 className="text-3xl font-bold text-emerald-900">ปัญหาที่ผู้รับเหมารายงาน</h1>
-          <p className="text-emerald-700">ติดตามสถานการณ์ในสวนและให้คำแนะนำกลับไปยังผู้รับเหมา</p>
+        <BackButton fallback="/owner/dashboard" />
+        <header className="space-y-4">
+          <div>
+            <h1 className="text-3xl font-bold text-emerald-900">ปัญหาที่ผู้รับเหมารายงาน</h1>
+            <p className="text-emerald-700">ติดตามสถานการณ์ในสวนและให้คำแนะนำกลับไปยังผู้รับเหมา</p>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <label className="w-full sm:w-auto text-sm text-emerald-800 flex flex-col gap-2">
+              <span className="font-medium">ค้นหารายงาน</span>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="w-full sm:w-72 h-11 rounded-xl border border-emerald-200 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                placeholder="ค้นหาจาก Tree ID หรือคำแนะนำที่เคยตอบ"
+              />
+            </label>
+            <div className="text-sm text-emerald-700">
+              พบ {filteredReports.length} จาก {reports.length} รายงาน
+            </div>
+          </div>
         </header>
 
         {loading ? (
@@ -65,11 +104,13 @@ const OwnerProblemPage = () => {
               </div>
             )}
 
-            {reports.length === 0 ? (
-              <p className="text-emerald-700">ยังไม่มีปัญหาที่รายงานเข้ามา</p>
+            {filteredReports.length === 0 ? (
+              <p className="text-emerald-700">
+                {reports.length === 0 ? 'ยังไม่มีปัญหาที่รายงานเข้ามา' : 'ไม่พบรายงานที่ตรงกับคำค้น'}
+              </p>
             ) : (
               <div className="space-y-4">
-                {reports.map((report) => (
+                {filteredReports.map((report) => (
                   <article
                     key={report.id}
                     className="bg-white border border-emerald-100 rounded-3xl shadow p-6 space-y-4"

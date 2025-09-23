@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import BackButton from '../components/BackButton.jsx';
 import { createFruitRecord } from '../services/api.js';
 
 const RecordFruitPage = () => {
@@ -66,6 +67,7 @@ const RecordFruitPage = () => {
     <div className="min-h-screen bg-emerald-50">
       <div className="max-w-3xl mx-auto px-6 py-10">
         <div className="bg-white border border-emerald-100 rounded-3xl shadow-lg p-8 space-y-6">
+          <BackButton fallback="/broker/dashboard" />
           <header className="space-y-2">
             <h1 className="text-2xl font-bold text-emerald-900">บันทึกจำนวนผลทุเรียนที่เก็บเกี่ยวได้</h1>
             <p className="text-emerald-700">ระบุจำนวนผลผลิตแยกตามเกรดเพื่อให้เจ้าของสวนวางแผนการขาย</p>
@@ -106,13 +108,7 @@ const RecordFruitPage = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/broker/dashboard')}
-                className="h-11 px-5 rounded-xl border border-emerald-200 text-emerald-700 hover:border-emerald-400"
-              >
-                ย้อนกลับ
-              </button>
+              <BackButton fallback="/broker/dashboard" />
               <button
                 type="submit"
                 disabled={loading}

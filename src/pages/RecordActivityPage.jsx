@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { createActivityLog } from '../services/api.js';
+import BackButton from '../components/BackButton.jsx';
+import { createActivityLog, fetchActivityLogs } from '../services/api.js';
 
 const RecordActivityPage = () => {
   const navigate = useNavigate();
@@ -13,6 +14,9 @@ const RecordActivityPage = () => {
   });
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [search, setSearch] = useState('');
 
   if (!user) {
     return null;
@@ -38,6 +42,24 @@ const RecordActivityPage = () => {
     );
   }
 
+  const loadHistory = async () => {
+    if (!user) return;
+    setHistoryLoading(true);
+    try {
+      const response = await fetchActivityLogs({ brokerId: user.id });
+      setHistory(response.activities || []);
+    } catch (err) {
+      setStatus((prev) => prev || err.message || 'ไม่สามารถโหลดประวัติได้');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -49,7 +71,7 @@ const RecordActivityPage = () => {
     setLoading(true);
 
     try {
-      await createActivityLog({
+      const response = await createActivityLog({
         brokerId: user.id,
         treeId: formData.treeId,
         scopeType: formData.scopeType,
@@ -57,6 +79,11 @@ const RecordActivityPage = () => {
       });
       setStatus('บันทึกกิจกรรมเรียบร้อย');
       setFormData({ treeId: '', scopeType: 'single-tree', notes: '' });
+      if (response?.activity) {
+        setHistory((prev) => [response.activity, ...prev]);
+      } else {
+        loadHistory();
+      }
     } catch (err) {
       setStatus(err.message || 'ไม่สามารถบันทึกข้อมูลได้');
     } finally {
@@ -64,10 +91,35 @@ const RecordActivityPage = () => {
     }
   };
 
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredHistory = useMemo(() => {
+    if (!normalizedSearch) return history;
+    return history.filter((item) => {
+      const haystack = [item.treeId, item.scopeType, item.notes]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [history, normalizedSearch]);
+
+  const formatDateTime = (value) => {
+    if (!value) return '-';
+    try {
+      return new Date(value).toLocaleString('th-TH', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
+    } catch (err) {
+      return value;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-emerald-50">
       <div className="max-w-4xl mx-auto px-6 py-10">
         <div className="bg-white border border-emerald-100 rounded-3xl shadow-lg p-8 space-y-6">
+          <BackButton fallback="/broker/dashboard" />
           <header className="space-y-2">
             <h1 className="text-2xl font-bold text-emerald-900">บันทึกกิจกรรมที่ทำในสวน</h1>
             <p className="text-emerald-700">ระบุรายละเอียดกิจกรรมเพื่อให้เจ้าของสวนติดตามความคืบหน้าได้</p>
@@ -114,13 +166,7 @@ const RecordActivityPage = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/broker/dashboard')}
-                className="h-11 px-5 rounded-xl border border-emerald-200 text-emerald-700 hover:border-emerald-400"
-              >
-                ย้อนกลับ
-              </button>
+              <BackButton fallback="/broker/dashboard" />
               <button
                 type="submit"
                 disabled={loading}
@@ -136,6 +182,43 @@ const RecordActivityPage = () => {
               {status}
             </div>
           )}
+
+          <section className="space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <h2 className="text-xl font-semibold text-emerald-900">ประวัติกิจกรรมที่ส่ง</h2>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="w-full md:w-64 h-11 rounded-xl border border-emerald-200 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                placeholder="ค้นหาตามหมายเลขต้นหรือรายละเอียด"
+              />
+            </div>
+
+            <div className="space-y-3">
+              {historyLoading ? (
+                <p className="text-emerald-700">กำลังโหลดประวัติ...</p>
+              ) : filteredHistory.length === 0 ? (
+                <p className="text-emerald-700">ยังไม่มีการบันทึกกิจกรรม</p>
+              ) : (
+                filteredHistory.map((item) => (
+                  <article
+                    key={item.id}
+                    className="border border-emerald-100 rounded-2xl px-5 py-4 bg-emerald-50/60"
+                  >
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-emerald-800">
+                      <span className="font-semibold">Tree ID: {item.treeId}</span>
+                      <span className="rounded-full bg-white border border-emerald-200 px-3 py-1">
+                        {item.scopeType === 'whole-garden' ? 'ภาพรวม' : 'รายต้น'}
+                      </span>
+                      <span>{formatDateTime(item.createdAt)}</span>
+                    </div>
+                    <p className="mt-3 text-emerald-900">{item.notes}</p>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
         </div>
       </div>
     </div>

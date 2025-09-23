@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import BackButton from '../components/BackButton.jsx';
 import { fetchProposals, updateProposalStatus } from '../services/api.js';
 
 const statusLabels = {
@@ -18,6 +19,7 @@ const OwnerProposalsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
+  const [search, setSearch] = useState('');
 
   const loadData = async () => {
     try {
@@ -46,12 +48,49 @@ const OwnerProposalsPage = () => {
     }
   };
 
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredProposals = useMemo(() => {
+    if (!normalizedSearch) return proposals;
+    return proposals.filter((proposal) => {
+      const haystack = [
+        proposal.broker?.name,
+        proposal.broker?.email,
+        proposal.broker?.phone,
+        proposal.paymentMethod,
+        proposal.note,
+        statusLabels[proposal.status],
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [normalizedSearch, proposals]);
+
   return (
     <div className="min-h-screen bg-emerald-50">
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
-        <header className="space-y-2">
-          <h1 className="text-3xl font-bold text-emerald-900">ข้อเสนอจากผู้รับเหมา</h1>
-          <p className="text-emerald-700">ตรวจสอบรายละเอียดและยืนยันการทำงานกับผู้รับเหมา</p>
+        <BackButton fallback="/owner/dashboard" />
+        <header className="space-y-4">
+          <div>
+            <h1 className="text-3xl font-bold text-emerald-900">ข้อเสนอจากผู้รับเหมา</h1>
+            <p className="text-emerald-700">ตรวจสอบรายละเอียดและยืนยันการทำงานกับผู้รับเหมา</p>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <label className="w-full sm:w-auto text-sm text-emerald-800 flex flex-col gap-2">
+              <span className="font-medium">ค้นหาข้อเสนอ</span>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="w-full sm:w-72 h-11 rounded-xl border border-emerald-200 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                placeholder="ค้นหาจากชื่อผู้รับเหมา สถานะ หรือหมายเหตุ"
+              />
+            </label>
+            <div className="text-sm text-emerald-700">
+              พบ {filteredProposals.length} จาก {proposals.length} ข้อเสนอ
+            </div>
+          </div>
         </header>
 
         {loading ? (
@@ -66,11 +105,13 @@ const OwnerProposalsPage = () => {
               </div>
             )}
 
-            {proposals.length === 0 ? (
-              <p className="text-emerald-700">ยังไม่มีข้อเสนอเข้ามา</p>
+            {filteredProposals.length === 0 ? (
+              <p className="text-emerald-700">
+                {proposals.length === 0 ? 'ยังไม่มีข้อเสนอเข้ามา' : 'ไม่พบข้อเสนอที่ตรงกับคำค้น'}
+              </p>
             ) : (
               <div className="space-y-4">
-                {proposals.map((proposal) => (
+                {filteredProposals.map((proposal) => (
                   <article
                     key={proposal.id}
                     className="bg-white border border-emerald-100 rounded-3xl shadow p-6 space-y-4"

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import BackButton from '../components/BackButton.jsx';
 import { fetchTreeStatus } from '../services/api.js';
 
 const statusLabels = {
@@ -59,6 +60,7 @@ const TreeStatusPage = () => {
   return (
     <div className="min-h-screen bg-emerald-50">
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
+        <BackButton fallback="/owner/dashboard" />
         <header className="space-y-2">
           <h1 className="text-3xl font-bold text-emerald-900">สถานะต้นทุเรียนในสวน</h1>
           <p className="text-emerald-700">ติดตามสุขภาพต้นทุเรียนและวางแผนจัดการได้อย่างทันเวลา</p>

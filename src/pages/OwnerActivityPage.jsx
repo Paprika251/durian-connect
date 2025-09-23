@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import BackButton from '../components/BackButton.jsx';
 import { fetchActivityLogs } from '../services/api.js';
 
 const scopeLabels = {
@@ -10,6 +11,7 @@ const OwnerActivityPage = () => {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     let isMounted = true;
@@ -36,23 +38,59 @@ const OwnerActivityPage = () => {
     };
   }, []);
 
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredActivities = useMemo(() => {
+    if (!normalizedSearch) return activities;
+    return activities.filter((activity) => {
+      const haystack = [
+        activity.treeId,
+        activity.broker?.name,
+        activity.broker?.email,
+        activity.notes,
+        scopeLabels[activity.scopeType],
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [activities, normalizedSearch]);
+
   return (
     <div className="min-h-screen bg-emerald-50">
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
-        <header className="space-y-2">
-          <h1 className="text-3xl font-bold text-emerald-900">กิจกรรมที่ผู้รับเหมาบันทึก</h1>
-          <p className="text-emerald-700">ติดตามงานที่เกิดขึ้นในสวนจากผู้รับเหมาทุกคน</p>
+        <BackButton fallback="/owner/dashboard" />
+        <header className="space-y-4">
+          <div>
+            <h1 className="text-3xl font-bold text-emerald-900">กิจกรรมที่ผู้รับเหมาบันทึก</h1>
+            <p className="text-emerald-700">ติดตามงานที่เกิดขึ้นในสวนจากผู้รับเหมาทุกคน</p>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <label className="w-full sm:w-auto text-sm text-emerald-800 flex flex-col gap-2">
+              <span className="font-medium">ค้นหากิจกรรม</span>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="w-full sm:w-72 h-11 rounded-xl border border-emerald-200 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                placeholder="ค้นหาจาก Tree ID หรือรายละเอียดกิจกรรม"
+              />
+            </label>
+            <div className="text-sm text-emerald-700">
+              พบ {filteredActivities.length} จาก {activities.length} รายการ
+            </div>
+          </div>
         </header>
 
         {loading ? (
           <div className="bg-white border border-emerald-100 rounded-3xl shadow p-6 text-center text-emerald-700">กำลังโหลดข้อมูล...</div>
         ) : error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-3xl shadow p-6 text-center">{error}</div>
-        ) : activities.length === 0 ? (
+        ) : filteredActivities.length === 0 ? (
           <p className="text-emerald-700">ยังไม่มีกิจกรรมที่บันทึกไว้</p>
         ) : (
           <div className="space-y-4">
-            {activities.map((activity) => (
+            {filteredActivities.map((activity) => (
               <article key={activity.id} className="bg-white border border-emerald-100 rounded-3xl shadow p-6 space-y-4">
                 <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div>

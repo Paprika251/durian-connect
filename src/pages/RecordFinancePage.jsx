@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import { createFinanceRecord } from '../services/api.js';
+import BackButton from '../components/BackButton.jsx';
+import { createFinanceRecord, fetchFinanceRecords } from '../services/api.js';
 
 const RecordFinancePage = () => {
   const navigate = useNavigate();
@@ -15,6 +16,9 @@ const RecordFinancePage = () => {
   });
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [search, setSearch] = useState('');
 
   if (!user) {
     return null;
@@ -40,6 +44,24 @@ const RecordFinancePage = () => {
     );
   }
 
+  const loadHistory = async () => {
+    if (!user) return;
+    setHistoryLoading(true);
+    try {
+      const response = await fetchFinanceRecords({ brokerId: user.id });
+      setHistory(response.finances || []);
+    } catch (err) {
+      setStatus((prev) => prev || err.message || 'ไม่สามารถโหลดประวัติได้');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -51,7 +73,7 @@ const RecordFinancePage = () => {
     setLoading(true);
 
     try {
-      await createFinanceRecord({
+      const response = await createFinanceRecord({
         brokerId: user.id,
         paymentMethod: formData.paymentMethod,
         type: formData.type,
@@ -61,6 +83,11 @@ const RecordFinancePage = () => {
       });
       setStatus('ส่งรายการให้เจ้าของสวนตรวจสอบแล้ว');
       setFormData({ paymentMethod: 'cash', type: 'income', invoiceRef: '', amount: '', notes: '' });
+      if (response?.record) {
+        setHistory((prev) => [response.record, ...prev]);
+      } else {
+        loadHistory();
+      }
     } catch (err) {
       setStatus(err.message || 'ไม่สามารถบันทึกข้อมูลได้');
     } finally {
@@ -68,10 +95,41 @@ const RecordFinancePage = () => {
     }
   };
 
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredHistory = useMemo(() => {
+    if (!normalizedSearch) return history;
+    return history.filter((item) => {
+      const haystack = [
+        item.paymentMethod,
+        item.type,
+        item.invoiceRef,
+        item.notes,
+        item.status,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedSearch);
+    });
+  }, [history, normalizedSearch]);
+
+  const formatDateTime = (value) => {
+    if (!value) return '-';
+    try {
+      return new Date(value).toLocaleString('th-TH', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      });
+    } catch (err) {
+      return value;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-emerald-50">
       <div className="max-w-4xl mx-auto px-6 py-10">
         <div className="bg-white border border-emerald-100 rounded-3xl shadow-lg p-8 space-y-6">
+          <BackButton fallback="/broker/dashboard" />
           <header className="space-y-2">
             <h1 className="text-2xl font-bold text-emerald-900">บันทึกรายรับ / รายจ่าย</h1>
             <p className="text-emerald-700">กรอกข้อมูลให้ครบถ้วนเพื่อให้เจ้าของสวนอนุมัติรายการเข้าระบบ</p>
@@ -158,13 +216,7 @@ const RecordFinancePage = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => navigate('/broker/dashboard')}
-                className="h-11 px-5 rounded-xl border border-emerald-200 text-emerald-700 hover:border-emerald-400"
-              >
-                ย้อนกลับ
-              </button>
+              <BackButton fallback="/broker/dashboard" />
               <button
                 type="submit"
                 disabled={loading}
@@ -180,6 +232,69 @@ const RecordFinancePage = () => {
               {status}
             </div>
           )}
+
+          <section className="space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <h2 className="text-xl font-semibold text-emerald-900">ประวัติรายการรายรับ/รายจ่าย</h2>
+              <input
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="w-full md:w-64 h-11 rounded-xl border border-emerald-200 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                placeholder="ค้นหาจากหมายเหตุ ประเภท หรือเลขที่ใบเสร็จ"
+              />
+            </div>
+
+            <div className="space-y-3">
+              {historyLoading ? (
+                <p className="text-emerald-700">กำลังโหลดประวัติ...</p>
+              ) : filteredHistory.length === 0 ? (
+                <p className="text-emerald-700">ยังไม่มีการส่งรายการรายรับ/รายจ่าย</p>
+              ) : (
+                filteredHistory.map((item) => (
+                  <article
+                    key={item.id}
+                    className="border border-emerald-100 rounded-2xl px-5 py-4 bg-emerald-50/60 space-y-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-emerald-800">
+                      <span className="font-semibold">
+                        {item.type === 'income' ? 'รายรับ' : 'รายจ่าย'} • {item.paymentMethod === 'cash'
+                          ? 'เงินสด'
+                          : item.paymentMethod === 'transfer'
+                          ? 'โอนเงิน'
+                          : item.paymentMethod === 'credit'
+                          ? 'บัตรเครดิต'
+                          : 'อื่น ๆ'}
+                      </span>
+                      {item.invoiceRef && (
+                        <span className="rounded-full bg-white border border-emerald-200 px-3 py-1">{item.invoiceRef}</span>
+                      )}
+                      <span
+                        className={`rounded-full px-3 py-1 border ${
+                          item.status === 'approved'
+                            ? 'border-emerald-300 bg-emerald-100 text-emerald-800'
+                            : item.status === 'rejected'
+                            ? 'border-red-200 bg-red-50 text-red-700'
+                            : 'border-amber-200 bg-amber-50 text-amber-700'
+                        }`}
+                      >
+                        {item.status === 'approved'
+                          ? 'เจ้าของสวนอนุมัติแล้ว'
+                          : item.status === 'rejected'
+                          ? 'รายการถูกปฏิเสธ'
+                          : 'รอการตรวจสอบ'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-emerald-900">
+                      <p className="font-semibold">จำนวนเงิน {Number(item.amount || 0).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} บาท</p>
+                      <p className="text-sm text-emerald-700">บันทึกเมื่อ {formatDateTime(item.createdAt)}</p>
+                    </div>
+                    <p className="text-emerald-900">{item.notes}</p>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
         </div>
       </div>
     </div>

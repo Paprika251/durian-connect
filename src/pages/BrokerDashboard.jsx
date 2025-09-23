@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import BackButton from '../components/BackButton.jsx';
 import { fetchProposals } from '../services/api.js';
 
 const BrokerDashboard = () => {
@@ -38,6 +39,7 @@ const BrokerDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-amber-50">
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-8">
+        <BackButton fallback="/" className="self-start" />
         <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white border border-emerald-100 rounded-2xl shadow p-6">
           <div>
             <h1 className="text-3xl font-bold text-emerald-900">ยินดีต้อนรับคุณ {user.name || 'ผู้รับเหมา'}</h1>
