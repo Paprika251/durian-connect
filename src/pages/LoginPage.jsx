@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import BackButton from '../components/BackButton.jsx';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -35,7 +34,6 @@ const LoginPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-100 via-lime-100 to-emerald-100 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-xl bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-lime-200 p-10 space-y-6">
-        <BackButton fallback="/" className="mb-2" />
         <header className="space-y-2 text-center">
           <h1 className="text-3xl font-bold text-emerald-900">ระบบจัดการสวนทุเรียน</h1>
           <p className="text-emerald-700">เข้าสู่ระบบเพื่อบริหารจัดการสวนและทีมผู้รับเหมา</p>

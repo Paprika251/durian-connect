@@ -166,7 +166,6 @@ const RecordActivityPage = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              <BackButton fallback="/broker/dashboard" />
               <button
                 type="submit"
                 disabled={loading}
