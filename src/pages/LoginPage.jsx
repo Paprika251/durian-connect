@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { fetchOwnerContact } from '../services/api.js';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -11,6 +12,28 @@ const LoginPage = () => {
     password: '',
   });
   const [feedback, setFeedback] = useState('');
+  const [ownerContact, setOwnerContact] = useState(null);
+  const [contactError, setContactError] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadContact = async () => {
+      try {
+        const response = await fetchOwnerContact();
+        if (!isMounted) return;
+        setOwnerContact(response?.owner || null);
+        setContactError('');
+      } catch (err) {
+        if (!isMounted) return;
+        setContactError(err.message || 'ไม่สามารถดึงข้อมูลการติดต่อของเจ้าของสวนได้');
+      }
+    };
+
+    loadContact();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -112,11 +135,29 @@ const LoginPage = () => {
           </div>
         )}
 
-        <div className="text-center text-sm text-emerald-800">
-          <p>ผู้รับเหมาใหม่สามารถลงทะเบียนเพื่อใช้งานระบบ</p>
-          <Link to="/register-broker" className="font-semibold text-emerald-700 underline-offset-4 hover:underline">
-            ลงทะเบียนผู้รับเหมาใหม่
-          </Link>
+        <div className="text-center text-sm text-emerald-800 space-y-2">
+          <div>
+            <p>ผู้รับเหมาใหม่สามารถลงทะเบียนเพื่อใช้งานระบบ</p>
+            <Link to="/register-broker" className="font-semibold text-emerald-700 underline-offset-4 hover:underline">
+              ลงทะเบียนผู้รับเหมาใหม่
+            </Link>
+          </div>
+
+          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 text-left">
+            <p className="font-semibold text-emerald-900">ข้อมูลการติดต่อเจ้าของสวน</p>
+            {ownerContact ? (
+              <ul className="mt-2 space-y-1 text-emerald-700">
+                <li>ชื่อ: {ownerContact.name}</li>
+                {ownerContact.phone && <li>เบอร์โทร: {ownerContact.phone}</li>}
+                {ownerContact.address && <li>ที่อยู่: {ownerContact.address}</li>}
+                {ownerContact.email && <li>อีเมล: {ownerContact.email}</li>}
+              </ul>
+            ) : contactError ? (
+              <p className="mt-2 text-red-600">{contactError}</p>
+            ) : (
+              <p className="mt-2 text-emerald-600">กำลังโหลดข้อมูลการติดต่อ...</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

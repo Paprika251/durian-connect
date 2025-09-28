@@ -7,6 +7,7 @@ import RecordActivityPage from './pages/RecordActivityPage.jsx';
 import RecordFruitPage from './pages/RecordFruitPage.jsx';
 import RecordFinancePage from './pages/RecordFinancePage.jsx';
 import ReportProblemPage from './pages/ReportProblemPage.jsx';
+import BrokerProfilePage from './pages/BrokerProfilePage.jsx';
 import OwnerDashboard from './pages/OwnerDashboard.jsx';
 import TreeStatusPage from './pages/TreeStatusPage.jsx';
 import HarvestOverviewPage from './pages/HarvestOverviewPage.jsx';
@@ -14,6 +15,7 @@ import OwnerProposalsPage from './pages/OwnerProposalsPage.jsx';
 import OwnerFinancePage from './pages/OwnerFinancePage.jsx';
 import OwnerProblemPage from './pages/OwnerProblemPage.jsx';
 import OwnerActivityPage from './pages/OwnerActivityPage.jsx';
+import OwnerProfilePage from './pages/OwnerProfilePage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
@@ -27,6 +29,14 @@ const App = () => (
       element={(
         <ProtectedRoute allowedRoles={["broker"]}>
           <BrokerDashboard />
+        </ProtectedRoute>
+      )}
+    />
+    <Route
+      path="/broker/profile"
+      element={(
+        <ProtectedRoute allowedRoles={["broker"]}>
+          <BrokerProfilePage />
         </ProtectedRoute>
       )}
     />
@@ -76,6 +86,14 @@ const App = () => (
       element={(
         <ProtectedRoute allowedRoles={["owner"]}>
           <OwnerDashboard />
+        </ProtectedRoute>
+      )}
+    />
+    <Route
+      path="/owner/profile"
+      element={(
+        <ProtectedRoute allowedRoles={["owner"]}>
+          <OwnerProfilePage />
         </ProtectedRoute>
       )}
     />

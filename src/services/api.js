@@ -159,3 +159,7 @@ export function updateUserProfile(id, payload) {
     body: JSON.stringify(payload),
   });
 }
+
+export function fetchOwnerContact() {
+  return request('/owner-contact');
+}

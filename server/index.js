@@ -310,9 +310,17 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (method === 'POST' && pathname === '/api/activities') {
-      const { brokerId, treeId, scopeType, notes } = body || {};
-      if (!brokerId || !treeId || !scopeType || !notes) {
+      const { brokerId, treeId: rawTreeId, scopeType, notes } = body || {};
+      const normalizedScope = scopeType === 'whole-garden' ? 'whole-garden' : 'single-tree';
+      const trimmedTreeId = typeof rawTreeId === 'string' ? rawTreeId.trim() : '';
+      const trimmedNotes = typeof notes === 'string' ? notes.trim() : '';
+
+      if (!brokerId || !normalizedScope || !trimmedNotes) {
         sendJson(res, 400, { message: 'ข้อมูลไม่ครบถ้วน' });
+        return;
+      }
+      if (normalizedScope === 'single-tree' && !trimmedTreeId) {
+        sendJson(res, 400, { message: 'กรุณาระบุหมายเลขต้นทุเรียน' });
         return;
       }
       const data = await loadData();
@@ -324,9 +332,9 @@ const server = http.createServer(async (req, res) => {
       const log = {
         id: randomUUID(),
         brokerId,
-        treeId,
-        scopeType,
-        notes,
+        treeId: normalizedScope === 'single-tree' ? trimmedTreeId : null,
+        scopeType: normalizedScope,
+        notes: trimmedNotes,
         createdAt: new Date().toISOString(),
       };
       data.activities.push(log);
@@ -465,9 +473,17 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (method === 'POST' && pathname === '/api/problems') {
-      const { brokerId, treeId, scopeType, notes } = body || {};
-      if (!brokerId || !treeId || !scopeType || !notes) {
+      const { brokerId, treeId: rawTreeId, scopeType, notes } = body || {};
+      const normalizedScope = scopeType === 'whole-garden' ? 'whole-garden' : 'single-tree';
+      const trimmedTreeId = typeof rawTreeId === 'string' ? rawTreeId.trim() : '';
+      const trimmedNotes = typeof notes === 'string' ? notes.trim() : '';
+
+      if (!brokerId || !normalizedScope || !trimmedNotes) {
         sendJson(res, 400, { message: 'ข้อมูลไม่ครบถ้วน' });
+        return;
+      }
+      if (normalizedScope === 'single-tree' && !trimmedTreeId) {
+        sendJson(res, 400, { message: 'กรุณาระบุหมายเลขต้นทุเรียน' });
         return;
       }
       const data = await loadData();
@@ -479,9 +495,9 @@ const server = http.createServer(async (req, res) => {
       const report = {
         id: randomUUID(),
         brokerId,
-        treeId,
-        scopeType,
-        notes,
+        treeId: normalizedScope === 'single-tree' ? trimmedTreeId : null,
+        scopeType: normalizedScope,
+        notes: trimmedNotes,
         createdAt: new Date().toISOString(),
         ownerResponse: null,
       };
@@ -527,6 +543,24 @@ const server = http.createServer(async (req, res) => {
     if (method === 'GET' && pathname === '/api/tree-status') {
       const data = await loadData();
       sendJson(res, 200, { trees: data.treeStatus });
+      return;
+    }
+
+    if (method === 'GET' && pathname === '/api/owner-contact') {
+      const data = await loadData();
+      const owner = data.users.find((user) => user.role === 'owner');
+      if (!owner) {
+        sendJson(res, 404, { message: 'ไม่พบข้อมูลเจ้าของสวน' });
+        return;
+      }
+      sendJson(res, 200, {
+        owner: {
+          name: owner.name || 'เจ้าของสวน',
+          phone: owner.phone || '',
+          address: owner.address || '',
+          email: owner.email || '',
+        },
+      });
       return;
     }
 

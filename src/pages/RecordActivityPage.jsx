@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import BackButton from '../components/BackButton.jsx';
 import { createActivityLog, fetchActivityLogs } from '../services/api.js';
+import { useTreeOptions } from '../hooks/useTreeOptions.js';
 
 const RecordActivityPage = () => {
   const navigate = useNavigate();
@@ -17,6 +18,9 @@ const RecordActivityPage = () => {
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const { options: treeOptions, loading: treeLoading, error: treeError } = useTreeOptions();
+
+  const treeIdRequired = formData.scopeType === 'single-tree';
 
   if (!user) {
     return null;
@@ -62,21 +66,46 @@ const RecordActivityPage = () => {
 
   const handleChange = (event) => {
     const { name, value } = event.target;
+    if (name === 'scopeType') {
+      setFormData((prev) => ({
+        ...prev,
+        scopeType: value,
+        treeId: value === 'single-tree' ? prev.treeId : '',
+      }));
+      return;
+    }
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setStatus('');
+
+    const trimmedTreeId = formData.treeId.trim();
+    const trimmedNotes = formData.notes.trim();
+
+    if (treeIdRequired && !trimmedTreeId) {
+      setStatus('กรุณาเลือกหมายเลขต้นทุเรียนสำหรับกิจกรรมรายต้น');
+      return;
+    }
+
+    if (!trimmedNotes) {
+      setStatus('กรุณากรอกรายละเอียดกิจกรรม');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await createActivityLog({
+      const payload = {
         brokerId: user.id,
-        treeId: formData.treeId,
         scopeType: formData.scopeType,
-        notes: formData.notes,
-      });
+        notes: trimmedNotes,
+      };
+      if (treeIdRequired) {
+        payload.treeId = trimmedTreeId;
+      }
+      const response = await createActivityLog(payload);
       setStatus('บันทึกกิจกรรมเรียบร้อย');
       setFormData({ treeId: '', scopeType: 'single-tree', notes: '' });
       if (response?.activity) {
@@ -127,14 +156,42 @@ const RecordActivityPage = () => {
 
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <InputField
-                label="หมายเลขต้นทุเรียน (Tree ID)"
-                name="treeId"
-                value={formData.treeId}
-                onChange={handleChange}
-                placeholder="เช่น T-101"
-                required
-              />
+              <div className="space-y-2">
+                <label htmlFor="treeId" className="font-semibold text-emerald-900">
+                  หมายเลขต้นทุเรียน (Tree ID)
+                </label>
+                <input
+                  id="treeId"
+                  name="treeId"
+                  value={formData.treeId}
+                  onChange={handleChange}
+                  list="activity-tree-options"
+                  disabled={!treeIdRequired}
+                  required={treeIdRequired}
+                  placeholder={
+                    treeIdRequired
+                      ? 'ค้นหาและเลือกหมายเลขต้น'
+                      : 'เลือกประเภทกิจกรรมเป็นรายต้นเพื่อระบุหมายเลข'
+                  }
+                  className={`w-full h-12 rounded-xl border px-4 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
+                    treeIdRequired
+                      ? 'border-emerald-200 bg-white'
+                      : 'border-emerald-100 bg-emerald-50 text-emerald-500'
+                  }`}
+                />
+                <datalist id="activity-tree-options">
+                  {treeOptions.map((option) => (
+                    <option key={option.value} value={option.value} label={option.label} />
+                  ))}
+                </datalist>
+                {treeLoading ? (
+                  <p className="text-sm text-emerald-600">กำลังโหลดรายชื่อต้นทุเรียน...</p>
+                ) : treeError ? (
+                  <p className="text-sm text-red-600">{treeError}</p>
+                ) : (
+                  <p className="text-sm text-emerald-600">เลือกจากรายการหรือพิมพ์รหัสต้นทุเรียนเพื่อค้นหา</p>
+                )}
+              </div>
               <div className="space-y-2">
                 <label className="font-semibold text-emerald-900">ประเภทกิจกรรม</label>
                 <select
@@ -206,7 +263,11 @@ const RecordActivityPage = () => {
                     className="border border-emerald-100 rounded-2xl px-5 py-4 bg-emerald-50/60"
                   >
                     <div className="flex flex-wrap items-center gap-3 text-sm text-emerald-800">
-                      <span className="font-semibold">Tree ID: {item.treeId}</span>
+                      <span className="font-semibold">
+                        {item.scopeType === 'whole-garden'
+                          ? 'ภาพรวมทั้งสวน'
+                          : `Tree ID: ${item.treeId || '-'}`}
+                      </span>
                       <span className="rounded-full bg-white border border-emerald-200 px-3 py-1">
                         {item.scopeType === 'whole-garden' ? 'ภาพรวม' : 'รายต้น'}
                       </span>
@@ -223,22 +284,5 @@ const RecordActivityPage = () => {
     </div>
   );
 };
-
-const InputField = ({ label, name, value, onChange, placeholder, required }) => (
-  <div className="space-y-2">
-    <label htmlFor={name} className="font-semibold text-emerald-900">
-      {label}
-    </label>
-    <input
-      id={name}
-      name={name}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      required={required}
-      className="w-full h-12 rounded-xl border border-emerald-200 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-    />
-  </div>
-);
 
 export default RecordActivityPage;

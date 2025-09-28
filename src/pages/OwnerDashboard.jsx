@@ -1,10 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import ProfileEditor from '../components/ProfileEditor.jsx';
 
 const OwnerDashboard = () => {
   const navigate = useNavigate();
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout } = useAuth();
 
   if (!user) {
     return null;
@@ -39,7 +38,18 @@ const OwnerDashboard = () => {
           </button>
         </header>
 
-        <ProfileEditor user={user} onUpdated={updateUser} />
+        <section className="bg-white border border-emerald-100 rounded-3xl shadow p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-emerald-900">จัดการข้อมูลโปรไฟล์</h2>
+            <p className="text-emerald-700">อัปเดตเบอร์โทร อีเมล ที่อยู่ หรือรหัสผ่านของคุณได้จากหน้าเฉพาะ</p>
+          </div>
+          <Link
+            to="/owner/profile"
+            className="inline-flex items-center justify-center h-11 px-6 rounded-xl bg-emerald-600 text-white font-semibold shadow hover:bg-emerald-700"
+          >
+            ไปยังหน้าแก้ไขโปรไฟล์
+          </Link>
+        </section>
 
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {menuItems.map((item) => (
