@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import BackButton from '../components/BackButton.jsx';
-import { createProposal, fetchHarvestSummary, fetchProposals } from '../services/api.js';
+import { createProposal, fetchProposals, fetchTreeStatus } from '../services/api.js';
 
 const initialState = {
   contactDeadline: '',
@@ -21,9 +21,9 @@ const SubmitProposalPage = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
 
-  const [harvestInfo, setHarvestInfo] = useState(null);
-  const [harvestLoading, setHarvestLoading] = useState(false);
-  const [harvestError, setHarvestError] = useState('');
+  const [treeStatus, setTreeStatus] = useState([]);
+  const [treeLoading, setTreeLoading] = useState(false);
+  const [treeError, setTreeError] = useState('');
 
   const loadHistory = useCallback(async () => {
     if (!user?.id) {
@@ -42,16 +42,16 @@ const SubmitProposalPage = () => {
     }
   }, [user?.id]);
 
-  const loadHarvest = useCallback(async () => {
-    setHarvestLoading(true);
-    setHarvestError('');
+  const loadTrees = useCallback(async () => {
+    setTreeLoading(true);
+    setTreeError('');
     try {
-      const response = await fetchHarvestSummary();
-      setHarvestInfo(response || null);
+      const response = await fetchTreeStatus();
+      setTreeStatus(Array.isArray(response?.trees) ? response.trees : []);
     } catch (err) {
-      setHarvestError(err.message || 'ไม่สามารถโหลดข้อมูลผลผลิตได้');
+      setTreeError(err.message || 'ไม่สามารถโหลดข้อมูลต้นทุเรียนได้');
     } finally {
-      setHarvestLoading(false);
+      setTreeLoading(false);
     }
   }, []);
 
@@ -60,8 +60,8 @@ const SubmitProposalPage = () => {
   }, [loadHistory]);
 
   useEffect(() => {
-    loadHarvest();
-  }, [loadHarvest]);
+    loadTrees();
+  }, [loadTrees]);
 
   if (!user) {
     return null;
@@ -104,11 +104,18 @@ const SubmitProposalPage = () => {
     });
   }, [history]);
 
-  const harvestSummary = harvestInfo?.summary || null;
-  const totalHarvest = useMemo(() => {
-    if (!harvestSummary) return 0;
-    return Object.values(harvestSummary).reduce((acc, value) => acc + Number(value || 0), 0);
-  }, [harvestSummary]);
+  const totalTrees = treeStatus.length;
+  const statusCounts = useMemo(() => {
+    return treeStatus.reduce(
+      (acc, item) => {
+        const key = item?.status || 'other';
+        acc[key] = (acc[key] || 0) + 1;
+        acc.other = acc.other || 0;
+        return acc;
+      },
+      {},
+    );
+  }, [treeStatus]);
 
   const formatDate = (value, options = { dateStyle: 'medium' }) => {
     if (!value) return '-';
@@ -149,35 +156,35 @@ const SubmitProposalPage = () => {
           </header>
 
           <section className="bg-emerald-50/60 border border-emerald-100 rounded-2xl px-5 py-4 space-y-3">
-            <h2 className="text-lg font-semibold text-emerald-900">ปริมาณทุเรียนพร้อมจำหน่ายในสวน</h2>
-            {harvestLoading ? (
+            <h2 className="text-lg font-semibold text-emerald-900">ข้อมูลต้นทุเรียนในสวน</h2>
+            {treeLoading ? (
               <p className="text-emerald-700">กำลังโหลดข้อมูล...</p>
-            ) : harvestError ? (
-              <p className="text-red-600">{harvestError}</p>
-            ) : harvestSummary ? (
+            ) : treeError ? (
+              <p className="text-red-600">{treeError}</p>
+            ) : totalTrees > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="rounded-xl bg-white border border-emerald-100 px-4 py-3">
-                  <p className="text-sm text-emerald-600">รวมทั้งหมด</p>
-                  <p className="text-2xl font-semibold text-emerald-900">{formatNumber(totalHarvest)} ลูก</p>
+                  <p className="text-sm text-emerald-600">จำนวนต้นทั้งหมด</p>
+                  <p className="text-2xl font-semibold text-emerald-900">{formatNumber(totalTrees)} ต้น</p>
                 </div>
                 <div className="space-y-2">
                   {[
-                    { key: 'A', label: 'เกรด A' },
-                    { key: 'B', label: 'เกรด B' },
-                    { key: 'C', label: 'เกรด C' },
-                    { key: 'reject', label: 'ตกเกรด' },
+                    { key: 'normal', label: 'ปกติ' },
+                    { key: 'flowering', label: 'ออกดอก' },
+                    { key: 'fruiting', label: 'ออกผล' },
+                    { key: 'issue', label: 'มีปัญหา' },
                   ].map((item) => (
                     <div key={item.key} className="flex items-center justify-between rounded-xl bg-white border border-emerald-100 px-4 py-2">
                       <span className="text-emerald-800">{item.label}</span>
                       <span className="font-semibold text-emerald-900">
-                        {formatNumber(harvestSummary[item.key] || 0)} ลูก
+                        {formatNumber(statusCounts[item.key] || 0)} ต้น
                       </span>
                     </div>
                   ))}
                 </div>
               </div>
             ) : (
-              <p className="text-emerald-700">ยังไม่มีข้อมูลผลผลิตในระบบ</p>
+              <p className="text-emerald-700">ยังไม่มีข้อมูลต้นทุเรียนในระบบ</p>
             )}
           </section>
 

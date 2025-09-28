@@ -179,6 +179,52 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    const userMatch = matchPath(pathname, '/api/users/:id');
+    if (method === 'PATCH' && userMatch) {
+      const { id } = userMatch;
+      const { phone, address, email, password } = body || {};
+
+      if (!phone && !address && !email && !password) {
+        sendJson(res, 400, { message: 'กรุณาระบุข้อมูลที่ต้องการแก้ไข' });
+        return;
+      }
+
+      const data = await loadData();
+      const user = data.users.find((item) => item.id === id);
+      if (!user) {
+        sendJson(res, 404, { message: 'ไม่พบบัญชีผู้ใช้' });
+        return;
+      }
+
+      if (email && email !== user.email) {
+        const emailTaken = data.users.some(
+          (item) => item.id !== id && item.email.toLowerCase() === email.toLowerCase(),
+        );
+        if (emailTaken) {
+          sendJson(res, 409, { message: 'อีเมลนี้ถูกใช้งานแล้ว' });
+          return;
+        }
+        user.email = email;
+      }
+
+      if (phone) {
+        user.phone = phone;
+      }
+
+      if (address) {
+        user.address = address;
+      }
+
+      if (password) {
+        user.passwordHash = hashPassword(password);
+      }
+
+      user.updatedAt = new Date().toISOString();
+      await saveData(data);
+      sendJson(res, 200, { user: sanitizeUser(user) });
+      return;
+    }
+
     if (method === 'POST' && pathname === '/api/auth/login') {
       const { email, password, role } = body || {};
       if (!email || !password || !role) {

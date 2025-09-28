@@ -152,3 +152,10 @@ export function respondProblemReport(id, message) {
 export function fetchTreeStatus() {
   return request('/tree-status');
 }
+
+export function updateUserProfile(id, payload) {
+  return request(`/users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}

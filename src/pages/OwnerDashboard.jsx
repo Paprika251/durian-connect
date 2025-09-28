@@ -1,10 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
-import BackButton from '../components/BackButton.jsx';
+import ProfileEditor from '../components/ProfileEditor.jsx';
 
 const OwnerDashboard = () => {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
 
   if (!user) {
     return null;
@@ -22,7 +22,6 @@ const OwnerDashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-amber-50">
       <div className="max-w-6xl mx-auto px-6 py-10 space-y-8">
-        <BackButton fallback="/" className="self-start" />
         <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white border border-emerald-100 rounded-3xl shadow p-6">
           <div>
             <h1 className="text-3xl font-bold text-emerald-900">แดชบอร์ดเจ้าของสวน</h1>
@@ -39,6 +38,8 @@ const OwnerDashboard = () => {
             ออกจากระบบ
           </button>
         </header>
+
+        <ProfileEditor user={user} onUpdated={updateUser} />
 
         <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {menuItems.map((item) => (
