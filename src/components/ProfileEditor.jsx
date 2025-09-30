@@ -3,14 +3,15 @@ import { updateUserProfile } from '../services/api.js';
 
 const defaultStatus = { type: '', message: '' };
 
-const ProfileEditor = ({ user, onUpdated, className = '' }) => {
-  const [formData, setFormData] = useState({ phone: '', email: '', address: '', password: '' });
+const ProfileEditor = ({ user, onUpdated, className = '', allowName = false }) => {
+  const [formData, setFormData] = useState({ name: '', phone: '', email: '', address: '', password: '' });
   const [status, setStatus] = useState(defaultStatus);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!user) return;
     setFormData({
+      name: user.name || '',
       phone: user.phone || '',
       email: user.email || '',
       address: user.address || '',
@@ -27,6 +28,9 @@ const ProfileEditor = ({ user, onUpdated, className = '' }) => {
   const dirtyPayload = useMemo(() => {
     if (!user) return {};
     const payload = {};
+    if (allowName && formData.name !== user.name) {
+      payload.name = formData.name.trim();
+    }
     if (formData.phone !== user.phone) {
       payload.phone = formData.phone.trim();
     }
@@ -78,6 +82,16 @@ const ProfileEditor = ({ user, onUpdated, className = '' }) => {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {allowName && (
+          <InputField
+            label="ชื่อ"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+            placeholder="ชื่อที่จะแสดงในระบบ"
+            required
+          />
+        )}
         <InputField
           label="เบอร์โทร"
           name="phone"

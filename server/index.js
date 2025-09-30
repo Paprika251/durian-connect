@@ -49,6 +49,10 @@ const createDefaultData = () => ({
     { treeId: 'T-032', status: 'issue', notes: 'พบอาการใบเหลือง ต้องตรวจสอบเพิ่มเติม' },
     { treeId: 'T-041', status: 'normal', notes: 'ผลโตใกล้เก็บเกี่ยว' },
   ],
+  proposalSettings: {
+    submissionDeadline: null,
+    updatedAt: null,
+  },
 });
 
 async function ensureDataFile() {
@@ -74,6 +78,20 @@ function sanitizeUser(user) {
   if (!user) return null;
   const { passwordHash, ...rest } = user;
   return rest;
+}
+
+function ensureProposalSettings(data) {
+  if (!data.proposalSettings) {
+    data.proposalSettings = { submissionDeadline: null, updatedAt: null };
+  } else {
+    if (!Object.prototype.hasOwnProperty.call(data.proposalSettings, 'submissionDeadline')) {
+      data.proposalSettings.submissionDeadline = null;
+    }
+    if (!Object.prototype.hasOwnProperty.call(data.proposalSettings, 'updatedAt')) {
+      data.proposalSettings.updatedAt = null;
+    }
+  }
+  return data.proposalSettings;
 }
 
 function attachBroker(data, items) {
@@ -182,9 +200,9 @@ const server = http.createServer(async (req, res) => {
     const userMatch = matchPath(pathname, '/api/users/:id');
     if (method === 'PATCH' && userMatch) {
       const { id } = userMatch;
-      const { phone, address, email, password } = body || {};
+      const { phone, address, email, password, name } = body || {};
 
-      if (!phone && !address && !email && !password) {
+      if (!phone && !address && !email && !password && !name) {
         sendJson(res, 400, { message: 'กรุณาระบุข้อมูลที่ต้องการแก้ไข' });
         return;
       }
@@ -205,6 +223,15 @@ const server = http.createServer(async (req, res) => {
           return;
         }
         user.email = email;
+      }
+
+      if (typeof name === 'string') {
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+          sendJson(res, 400, { message: 'ชื่อห้ามเว้นว่าง' });
+          return;
+        }
+        user.name = trimmedName;
       }
 
       if (phone) {
@@ -243,30 +270,94 @@ const server = http.createServer(async (req, res) => {
 
     if (method === 'GET' && pathname === '/api/proposals') {
       const data = await loadData();
+      const settings = ensureProposalSettings(data);
       const brokerId = searchParams.get('brokerId');
       const proposals = brokerId
         ? data.proposals.filter((proposal) => proposal.brokerId === brokerId)
         : data.proposals;
-      sendJson(res, 200, { proposals: attachBroker(data, proposals) });
+      sendJson(res, 200, {
+        proposals: attachBroker(data, proposals),
+        submissionDeadline: settings.submissionDeadline,
+      });
+      return;
+    }
+
+    if (method === 'GET' && pathname === '/api/proposal-settings') {
+      const data = await loadData();
+      const settings = ensureProposalSettings(data);
+      sendJson(res, 200, {
+        submissionDeadline: settings.submissionDeadline,
+        updatedAt: settings.updatedAt,
+      });
+      return;
+    }
+
+    if (method === 'PATCH' && pathname === '/api/proposal-settings') {
+      const { submissionDeadline } = body || {};
+      const data = await loadData();
+      const settings = ensureProposalSettings(data);
+
+      if (submissionDeadline) {
+        const parsedDeadline = new Date(submissionDeadline);
+        if (Number.isNaN(parsedDeadline.getTime())) {
+          sendJson(res, 400, { message: 'รูปแบบวันที่ไม่ถูกต้อง' });
+          return;
+        }
+        settings.submissionDeadline = parsedDeadline.toISOString();
+      } else {
+        settings.submissionDeadline = null;
+      }
+
+      settings.updatedAt = new Date().toISOString();
+      await saveData(data);
+      sendJson(res, 200, {
+        submissionDeadline: settings.submissionDeadline,
+        updatedAt: settings.updatedAt,
+      });
       return;
     }
 
     if (method === 'POST' && pathname === '/api/proposals') {
       const { brokerId, contactDeadline, quantity, price, paymentMethod, note } = body || {};
-      if (!brokerId || !contactDeadline || typeof quantity !== 'number' || typeof price !== 'number') {
+      if (!brokerId || typeof quantity !== 'number' || typeof price !== 'number') {
         sendJson(res, 400, { message: 'ข้อมูลข้อเสนอไม่ครบถ้วน' });
         return;
       }
       const data = await loadData();
+      const settings = ensureProposalSettings(data);
+      const now = new Date();
+      let activeDeadline = null;
+      if (settings.submissionDeadline) {
+        const parsedDeadline = new Date(settings.submissionDeadline);
+        if (!Number.isNaN(parsedDeadline.getTime())) {
+          activeDeadline = parsedDeadline;
+        } else {
+          settings.submissionDeadline = null;
+        }
+      }
+
+      if (activeDeadline && now > activeDeadline) {
+        sendJson(res, 403, { message: 'หมดเขตรับข้อเสนอแล้ว' });
+        return;
+      }
       const broker = data.users.find((user) => user.id === brokerId && user.role === 'broker');
       if (!broker) {
         sendJson(res, 404, { message: 'ไม่พบผู้รับเหมา' });
         return;
       }
+      let effectiveDeadline = null;
+      if (activeDeadline) {
+        effectiveDeadline = activeDeadline.toISOString();
+      } else if (contactDeadline) {
+        const fallbackDeadline = new Date(contactDeadline);
+        effectiveDeadline = Number.isNaN(fallbackDeadline.getTime())
+          ? contactDeadline
+          : fallbackDeadline.toISOString();
+      }
       const newProposal = {
         id: randomUUID(),
         brokerId,
-        contactDeadline,
+        contactDeadline: effectiveDeadline,
         quantity,
         price,
         paymentMethod,
@@ -276,7 +367,7 @@ const server = http.createServer(async (req, res) => {
       };
       data.proposals.push(newProposal);
       await saveData(data);
-      sendJson(res, 201, { proposal: newProposal });
+      sendJson(res, 201, { proposal: newProposal, submissionDeadline: settings.submissionDeadline });
       return;
     }
 

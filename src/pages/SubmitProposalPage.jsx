@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import BackButton from '../components/BackButton.jsx';
-import { createProposal, fetchProposals, fetchTreeStatus } from '../services/api.js';
+import { createProposal, fetchProposalSettings, fetchProposals, fetchTreeStatus } from '../services/api.js';
 
 const initialState = {
-  contactDeadline: '',
   quantity: '',
   price: '',
   paymentMethod: 'cash',
@@ -24,6 +23,10 @@ const SubmitProposalPage = () => {
   const [treeStatus, setTreeStatus] = useState([]);
   const [treeLoading, setTreeLoading] = useState(false);
   const [treeError, setTreeError] = useState('');
+  const [submissionDeadline, setSubmissionDeadline] = useState(null);
+  const [deadlineUpdatedAt, setDeadlineUpdatedAt] = useState(null);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsError, setSettingsError] = useState('');
 
   const loadHistory = useCallback(async () => {
     if (!user?.id) {
@@ -35,12 +38,29 @@ const SubmitProposalPage = () => {
     try {
       const response = await fetchProposals({ brokerId: user.id });
       setHistory(Array.isArray(response?.proposals) ? response.proposals : []);
+      if (Object.prototype.hasOwnProperty.call(response || {}, 'submissionDeadline')) {
+        setSubmissionDeadline(response.submissionDeadline || null);
+      }
     } catch (err) {
       setHistoryError(err.message || 'ไม่สามารถโหลดประวัติข้อเสนอได้');
     } finally {
       setHistoryLoading(false);
     }
   }, [user?.id]);
+
+  const loadSettings = useCallback(async () => {
+    setSettingsLoading(true);
+    setSettingsError('');
+    try {
+      const response = await fetchProposalSettings();
+      setSubmissionDeadline(response?.submissionDeadline || null);
+      setDeadlineUpdatedAt(response?.updatedAt || null);
+    } catch (err) {
+      setSettingsError(err.message || 'ไม่สามารถโหลดกำหนดรับข้อเสนอได้');
+    } finally {
+      setSettingsLoading(false);
+    }
+  }, []);
 
   const loadTrees = useCallback(async () => {
     setTreeLoading(true);
@@ -60,6 +80,10 @@ const SubmitProposalPage = () => {
   }, [loadHistory]);
 
   useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  useEffect(() => {
     loadTrees();
   }, [loadTrees]);
 
@@ -72,23 +96,38 @@ const SubmitProposalPage = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const parsedDeadline = submissionDeadline ? new Date(submissionDeadline) : null;
+  const hasValidDeadline = parsedDeadline && !Number.isNaN(parsedDeadline.getTime());
+  const deadlinePassed = hasValidDeadline ? Date.now() > parsedDeadline.getTime() : false;
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setStatus('');
+    if (deadlinePassed) {
+      setStatus('หมดเขตรับข้อเสนอแล้ว');
+      return;
+    }
     setLoading(true);
 
     try {
-      await createProposal({
+      const payload = {
         brokerId: user.id,
-        contactDeadline: formData.contactDeadline,
         quantity: Number(formData.quantity),
         price: Number(formData.price),
         paymentMethod: formData.paymentMethod,
         note: formData.note,
-      });
+      };
+      if (submissionDeadline) {
+        payload.contactDeadline = submissionDeadline;
+      }
+      const response = await createProposal(payload);
+      if (Object.prototype.hasOwnProperty.call(response || {}, 'submissionDeadline')) {
+        setSubmissionDeadline(response.submissionDeadline || null);
+      }
       setStatus('ส่งข้อเสนอเรียบร้อยแล้ว รอการพิจารณาจากเจ้าของสวน');
       setFormData(initialState);
       await loadHistory();
+      await loadSettings();
     } catch (err) {
       setStatus(err.message || 'ไม่สามารถส่งข้อเสนอได้');
     } finally {
@@ -188,16 +227,38 @@ const SubmitProposalPage = () => {
             )}
           </section>
 
+          <section className="bg-amber-50/70 border border-amber-200 rounded-2xl px-5 py-4 space-y-2">
+            <h2 className="text-lg font-semibold text-amber-800">กำหนดรับข้อเสนอจากเจ้าของสวน</h2>
+            {settingsLoading ? (
+              <p className="text-amber-700">กำลังโหลดข้อมูลกำหนดการ...</p>
+            ) : settingsError ? (
+              <p className="text-red-600">{settingsError}</p>
+            ) : hasValidDeadline ? (
+              <div className="space-y-1">
+                <p className={`text-base font-semibold ${deadlinePassed ? 'text-red-600' : 'text-emerald-900'}`}>
+                  {deadlinePassed ? 'หมดเขตรับข้อเสนอเมื่อ' : 'เปิดรับข้อเสนอถึง'}
+                </p>
+                <p className={`text-xl font-bold ${deadlinePassed ? 'text-red-600' : 'text-emerald-900'}`}>
+                  {formatDate(parsedDeadline, { dateStyle: 'long', timeStyle: 'short' })}
+                </p>
+                <p className="text-sm text-emerald-700">
+                  {deadlinePassed
+                    ? 'กรุณารอให้เจ้าของสวนเปิดรอบการรับข้อเสนอใหม่'
+                    : 'โปรดยื่นข้อเสนอภายในเวลาที่กำหนดเพื่อให้พิจารณาได้ทันเวลา'}
+                </p>
+              </div>
+            ) : (
+              <p className="text-emerald-700">เจ้าของสวนยังไม่กำหนดวันสิ้นสุดการรับข้อเสนอในขณะนี้</p>
+            )}
+            {deadlineUpdatedAt && (
+              <p className="text-xs text-amber-700">
+                อัปเดตล่าสุด {formatDate(deadlineUpdatedAt, { dateStyle: 'medium', timeStyle: 'short' })}
+              </p>
+            )}
+          </section>
+
           <form className="space-y-5" onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <InputField
-                label="วันครบกำหนดติดต่อกลับ"
-                name="contactDeadline"
-                type="date"
-                value={formData.contactDeadline}
-                onChange={handleChange}
-                required
-              />
               <InputField
                 label="ปริมาณที่ต้องการ (กิโลกรัม)"
                 name="quantity"
@@ -207,9 +268,6 @@ const SubmitProposalPage = () => {
                 onChange={handleChange}
                 required
               />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <InputField
                 label="ราคาที่เสนอ (บาทต่อกิโลกรัม)"
                 name="price"
@@ -219,21 +277,21 @@ const SubmitProposalPage = () => {
                 onChange={handleChange}
                 required
               />
+            </div>
 
-              <div className="space-y-2">
-                <label className="font-semibold text-emerald-900">วิธีการจ่ายเงิน</label>
-                <select
-                  name="paymentMethod"
-                  value={formData.paymentMethod}
-                  onChange={handleChange}
-                  className="w-full h-12 rounded-xl border border-emerald-200 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                >
-                  <option value="cash">เงินสด</option>
-                  <option value="transfer">โอนเงิน</option>
-                  <option value="installment">ผ่อนชำระ</option>
-                  <option value="other">อื่น ๆ</option>
-                </select>
-              </div>
+            <div className="space-y-2">
+              <label className="font-semibold text-emerald-900">วิธีการจ่ายเงิน</label>
+              <select
+                name="paymentMethod"
+                value={formData.paymentMethod}
+                onChange={handleChange}
+                className="w-full h-12 rounded-xl border border-emerald-200 px-4 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              >
+                <option value="cash">เงินสด</option>
+                <option value="transfer">โอนเงิน</option>
+                <option value="installment">ผ่อนชำระ</option>
+                <option value="other">อื่น ๆ</option>
+              </select>
             </div>
 
             <div className="space-y-2">
@@ -254,12 +312,17 @@ const SubmitProposalPage = () => {
             <div className="flex items-center gap-3">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || deadlinePassed}
                 className="h-11 px-6 rounded-xl bg-amber-500 text-white font-semibold shadow hover:bg-amber-600 transition-colors disabled:opacity-70"
               >
                 {loading ? 'กำลังส่ง...' : 'ส่งข้อเสนอซื้อ'}
               </button>
             </div>
+            {deadlinePassed && (
+              <p className="text-sm text-red-600">
+                หมดเขตรับข้อเสนอแล้ว กรุณารอให้เจ้าของสวนกำหนดรอบใหม่
+              </p>
+            )}
           </form>
 
           {status && (
@@ -291,7 +354,7 @@ const SubmitProposalPage = () => {
                       <span className="rounded-full bg-white border border-emerald-200 px-3 py-1">
                         {renderStatusLabel(item.status)}
                       </span>
-                      <span>ติดต่อตอบกลับภายใน: {formatDate(item.contactDeadline)}</span>
+                      <span>กำหนดรับข้อเสนอ: {formatDate(item.contactDeadline)}</span>
                     </div>
                     <dl className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-emerald-900">
                       <div>

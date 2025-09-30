@@ -20,12 +20,25 @@ const OwnerProposalsPage = () => {
   const [error, setError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [search, setSearch] = useState('');
+  const [submissionDeadline, setSubmissionDeadline] = useState(null);
+
+  const formatDate = (value, options = { dateStyle: 'medium' }) => {
+    if (!value) return '-';
+    try {
+      return new Date(value).toLocaleString('th-TH', options);
+    } catch (err) {
+      return value;
+    }
+  };
 
   const loadData = async () => {
     try {
       setLoading(true);
       const response = await fetchProposals();
       setProposals(response.proposals || []);
+      if (Object.prototype.hasOwnProperty.call(response || {}, 'submissionDeadline')) {
+        setSubmissionDeadline(response.submissionDeadline || null);
+      }
     } catch (err) {
       setError(err.message || 'ไม่สามารถโหลดข้อมูลได้');
     } finally {
@@ -67,6 +80,16 @@ const OwnerProposalsPage = () => {
     });
   }, [normalizedSearch, proposals]);
 
+  const deadlineDate = submissionDeadline ? new Date(submissionDeadline) : null;
+  const deadlineValid = deadlineDate && !Number.isNaN(deadlineDate.getTime());
+  const deadlineExpired = deadlineValid ? Date.now() > deadlineDate.getTime() : false;
+  const deadlineInfo = deadlineValid
+    ? `${deadlineExpired ? 'หมดเขตรับข้อเสนอเมื่อ' : 'เปิดรับข้อเสนอถึง'} ${formatDate(deadlineDate, {
+        dateStyle: 'long',
+      })}`
+    : 'ยังไม่ได้กำหนดวันสิ้นสุดการรับข้อเสนอ';
+  const deadlineClass = deadlineExpired ? 'text-red-600' : 'text-emerald-700';
+
   return (
     <div className="min-h-screen bg-emerald-50">
       <div className="max-w-5xl mx-auto px-6 py-10 space-y-6">
@@ -91,6 +114,7 @@ const OwnerProposalsPage = () => {
               พบ {filteredProposals.length} จาก {proposals.length} ข้อเสนอ
             </div>
           </div>
+          <p className={`text-sm ${deadlineClass}`}>{deadlineInfo}</p>
         </header>
 
         {loading ? (
@@ -122,7 +146,7 @@ const OwnerProposalsPage = () => {
                           ข้อเสนอจาก {proposal.broker?.name || 'ไม่ทราบชื่อ'}
                         </h2>
                         <p className="text-sm text-emerald-700">
-                          ส่งเมื่อ {new Date(proposal.createdAt).toLocaleString('th-TH')}
+                          ส่งเมื่อ {formatDate(proposal.createdAt, { dateStyle: 'medium', timeStyle: 'short' })}
                         </p>
                       </div>
                       <span className={`px-4 py-2 text-sm font-semibold rounded-full ${statusColors[proposal.status] || statusColors.pending}`}>
@@ -131,7 +155,7 @@ const OwnerProposalsPage = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-emerald-800">
-                      <Detail label="วันครบกำหนดติดต่อกลับ" value={new Date(proposal.contactDeadline).toLocaleDateString('th-TH')} />
+                      <Detail label="กำหนดรับข้อเสนอ" value={formatDate(proposal.contactDeadline, { dateStyle: 'long' })} />
                       <Detail label="ปริมาณที่ต้องการ" value={`${proposal.quantity} กิโลกรัม`} />
                       <Detail label="ราคาที่เสนอ" value={`${proposal.price} บาท/กิโลกรัม`} />
                       <Detail label="วิธีการจ่ายเงิน" value={mapPaymentMethod(proposal.paymentMethod)} />

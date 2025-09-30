@@ -13,7 +13,7 @@ const OwnerProfilePage = () => {
     <div className="min-h-screen bg-emerald-50">
       <div className="max-w-3xl mx-auto px-6 py-10 space-y-6">
         <BackButton fallback="/owner/dashboard" />
-        <ProfileEditor user={user} onUpdated={updateUser} />
+        <ProfileEditor user={user} onUpdated={updateUser} allowName />
       </div>
     </div>
   );

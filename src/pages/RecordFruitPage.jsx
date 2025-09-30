@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import BackButton from '../components/BackButton.jsx';
-import { createFruitRecord } from '../services/api.js';
+import { createFruitRecord, fetchHarvestSummary } from '../services/api.js';
 
 const RecordFruitPage = () => {
   const navigate = useNavigate();
@@ -13,6 +13,28 @@ const RecordFruitPage = () => {
   });
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
+
+  const loadHistory = async () => {
+    if (!user?.id) {
+      setHistory([]);
+      return;
+    }
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const response = await fetchHarvestSummary();
+      const records = Array.isArray(response?.records) ? response.records : [];
+      const ownRecords = records.filter((item) => item.brokerId === user.id);
+      setHistory(ownRecords);
+    } catch (err) {
+      setHistoryError(err.message || 'ไม่สามารถโหลดประวัติผลผลิตได้');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   if (!user) {
     return null;
@@ -49,19 +71,42 @@ const RecordFruitPage = () => {
     setLoading(true);
 
     try {
-      await createFruitRecord({
+      const response = await createFruitRecord({
         brokerId: user.id,
         amount: Number(formData.amount),
         grade: formData.grade,
       });
       setStatus('บันทึกจำนวนผลผลิตเรียบร้อย');
       setFormData({ amount: '', grade: 'A' });
+      if (response?.record) {
+        setHistory((prev) => [response.record, ...prev]);
+      } else {
+        loadHistory();
+      }
     } catch (err) {
       setStatus(err.message || 'ไม่สามารถบันทึกข้อมูลได้');
     } finally {
       setLoading(false);
     }
   };
+
+  const sortedHistory = useMemo(() => {
+    return [...history].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [history]);
+
+  const formatDateTime = (value) => {
+    if (!value) return '-';
+    try {
+      return new Date(value).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+    } catch (err) {
+      return value;
+    }
+  };
+
+  useEffect(() => {
+    loadHistory();
+    // eslint-disable-next-line react-hooks-exhaustive-deps
+  }, [user?.id]);
 
   return (
     <div className="min-h-screen bg-emerald-50">
@@ -123,6 +168,43 @@ const RecordFruitPage = () => {
               {status}
             </div>
           )}
+
+          <section className="space-y-4">
+            <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <h2 className="text-xl font-semibold text-emerald-900">ประวัติการบันทึกผลผลิตของคุณ</h2>
+              <span className="text-sm text-emerald-700">
+                {historyLoading ? 'กำลังโหลดประวัติ...' : `ทั้งหมด ${sortedHistory.length} รายการ`}
+              </span>
+            </header>
+
+            {historyError && <p className="text-red-600 text-sm">{historyError}</p>}
+
+            {historyLoading ? (
+              <p className="text-emerald-700">กำลังโหลดข้อมูล...</p>
+            ) : sortedHistory.length === 0 ? (
+              <p className="text-emerald-700">ยังไม่มีการบันทึกผลผลิต</p>
+            ) : (
+              <div className="space-y-3">
+                {sortedHistory.map((item) => (
+                  <article
+                    key={item.id}
+                    className="border border-emerald-100 rounded-2xl px-5 py-4 bg-emerald-50/60"
+                  >
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-emerald-800">
+                      <span className="font-semibold">{formatDateTime(item.createdAt)}</span>
+                      <span className="rounded-full bg-white border border-emerald-200 px-3 py-1">
+                        เกรด {item.grade?.toUpperCase?.() || item.grade || '-'}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-emerald-900 font-semibold text-lg">
+                      {Number(item.amount || 0).toLocaleString('th-TH')} ลูก
+                    </p>
+                    {item.note && <p className="mt-1 text-sm text-emerald-700">{item.note}</p>}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       </div>
     </div>

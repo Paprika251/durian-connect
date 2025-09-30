@@ -78,6 +78,17 @@ export function fetchProposals(params = {}) {
   return request(`/proposals${suffix}`);
 }
 
+export function fetchProposalSettings() {
+  return request('/proposal-settings');
+}
+
+export function updateProposalSettings(payload) {
+  return request('/proposal-settings', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function updateProposalStatus(id, status) {
   return request(`/proposals/${id}`, {
     method: 'PATCH',
